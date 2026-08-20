@@ -1,0 +1,2 @@
+[console_scripts]
+dd-cost-lens = dd_cost_lens.cli:main

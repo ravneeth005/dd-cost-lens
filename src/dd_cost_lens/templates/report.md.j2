@@ -1,0 +1,90 @@
+# Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month
+
+## Scope
+
+| Field | Value |
+| --- | --- |
+| Organization | {{ report.organization }} |
+| Scope tag | {{ report.scope_tag }} |
+| Scope value | {{ report.project }} |
+| Environment tag | {{ report.env_tag }} |
+| Environment | {{ report.env }} |
+| Datadog query scope | `{{ report.scope_tag }}:{{ report.project }} AND {{ report.env_tag }}:{{ report.env }}` |
+
+## Updated Feature & Technical Scope
+
+```text
+                            [ User Terminal ]
+                                     |
+                     exports DD_API_KEY & DD_APP_KEY
+                                     |
+     dd-cost-lens run --scope-tag <tag> --scope-value <value> --env <env> [--redact]
+                                     |
+                           [ Validate Tags ]
+                          /                \\
+               [ Tag Exists ]          [ Tag Missing ]
+                    |                       |
+                    v                       v
+       Fetch Datadog metrics, logs,   Return error: scope or environment
+       hosts, and APM data             not found in Datadog telemetry
+                    |
+                    v
+       Analyze cardinality, unread metrics, retention, APM, and hosts
+                    |
+                    v
+       Generate this report and ready-to-apply remediation configs
+```
+
+## Metric Inventory
+
+{% if report.metric_monthly_cost_per_timeseries == 0 -%}
+Metric usage is shown below. Set `--metric-monthly-cost-per-timeseries` (or `DD_COST_LENS_METRIC_TS_MONTHLY_RATE`) to turn metric usage into monetary savings estimates.
+{% else -%}
+Metric savings use the supplied effective rate of ${{ "%.6f"|format(report.metric_monthly_cost_per_timeseries) }} per indexed timeseries/month.
+{% endif %}
+
+| Metric | Indexed volume | Ingested volume | Estimated monthly cost | Indexed tags | Readers |
+| --- | ---: | ---: | ---: | --- | --- |
+{% for metric in report.metrics -%}
+| `{{ metric.name }}` | {{ metric.indexed_volume | default(0, true) }} | {{ metric.ingested_volume | default("-", true) }} | ${{ "%.2f"|format(metric.monthly_cost | default(0, true)) }} | {{ metric.indexed_tags | default([], true) | join(", ") or "-" }} | {{ metric.readers | default([], true) | join(", ") or "unread" }} |
+{% else -%}
+| No metrics were returned for this scope. | - | - | - | - | - |
+{% endfor %}
+
+## Ranked Offenders
+
+| Title | Module | Estimated monthly saving | Effort |
+| --- | --- | ---: | --- |
+{% for finding in report.findings -%}
+| {{ finding.title }} | {{ finding.module }} | ${{ "%.2f"|format(finding.estimated_monthly_saving) }} | {{ finding.effort }} |
+{% endfor %}
+
+## Prioritized Remediation
+
+{% for finding in report.findings -%}
+{{ loop.index }}. **{{ finding.title }}**: {{ finding.detail }} Owner: `{{ finding.owner_tag }}`. Estimated saving: ${{ "%.2f"|format(finding.estimated_monthly_saving) }}/month.
+{% endfor %}
+
+## Attribution Rollup
+
+| Owner | Recoverable monthly saving |
+| --- | ---: |
+{% for owner, amount in report.owner_rollup.items() -%}
+| {{ owner }} | ${{ "%.2f"|format(amount) }} |
+{% endfor %}
+
+## Ready-To-Apply Remediations
+
+{% for remediation in report.remediations -%}
+### {{ remediation.title }}
+
+```{{ "toml" if remediation.kind == "vector_toml" else "json" if remediation.kind == "mwl_json" else "bash" }}
+{{ remediation.content }}
+```
+{% endfor %}
+
+## Next Steps
+
+Address low-effort findings first. Findings that require application or
+platform changes should be reviewed with the owning service team before any
+telemetry is removed.

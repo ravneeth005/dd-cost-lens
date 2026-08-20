@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+Effort = Literal["low", "medium", "high"]
+
+
+@dataclass(frozen=True)
+class Finding:
+    module: str
+    title: str
+    estimated_monthly_saving: float
+    effort: Effort
+    detail: str
+    owner_tag: str
+    remediation_type: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class OrgData:
+    organization: str
+    projects: list[str]
+    envs: dict[str, list[str]]
+    metrics: list[dict[str, Any]]
+    metric_readers: dict[str, list[str]]
+    log_indexes: list[dict[str, Any]]
+    apm_services: list[dict[str, Any]]
+    hosts: list[dict[str, Any]]
+    tag_values: dict[str, list[str]] = field(default_factory=dict)
+
+
+@dataclass
+class ReportData:
+    organization: str
+    scope_tag: str
+    env_tag: str
+    project: str
+    env: str
+    metrics: list[dict[str, Any]]
+    findings: list[Finding]
+    owner_rollup: dict[str, float]
+    remediations: list[dict[str, Any]]
+    metric_monthly_cost_per_timeseries: float = 0
+
+    @property
+    def headline_savings(self) -> float:
+        return round(sum(f.estimated_monthly_saving for f in self.findings), 2)

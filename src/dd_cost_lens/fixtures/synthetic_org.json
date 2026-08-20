@@ -1,0 +1,124 @@
+{
+  "organization": "fusionpact",
+  "projects": ["checkout", "catalog"],
+  "envs": {
+    "checkout": ["prod", "staging"],
+    "catalog": ["prod"]
+  },
+  "tag_values": {
+    "env": ["prod", "staging"],
+    "project": ["catalog", "checkout"],
+    "team": ["team-catalog", "team-payments", "team-platform", "team-web"]
+  },
+  "metrics": [
+    {
+      "name": "app.checkout.latency",
+      "project": "checkout",
+      "env": "prod",
+      "owner": "team-payments",
+      "monthly_cost": 1400,
+      "timeseries": 85000,
+      "top_tag": "user_id",
+      "tag_values": 42000,
+      "offending_tags": ["user_id", "session_id"],
+      "readers": ["dashboard:checkout-slo"]
+    },
+    {
+      "name": "app.checkout.cart_debug",
+      "project": "checkout",
+      "env": "prod",
+      "owner": "team-web",
+      "monthly_cost": 900,
+      "timeseries": 21000,
+      "top_tag": "request_id",
+      "tag_values": 20000,
+      "offending_tags": ["request_id"],
+      "readers": []
+    },
+    {
+      "name": "app.catalog.cache",
+      "project": "catalog",
+      "env": "prod",
+      "owner": "team-catalog",
+      "monthly_cost": 300,
+      "timeseries": 7000,
+      "top_tag": "sku_bucket",
+      "tag_values": 120,
+      "offending_tags": [],
+      "readers": ["monitor:catalog-cache"]
+    }
+  ],
+  "metric_readers": {
+    "app.checkout.latency": ["dashboard:checkout-slo"],
+    "app.checkout.cart_debug": [],
+    "app.catalog.cache": ["monitor:catalog-cache"]
+  },
+  "log_indexes": [
+    {
+      "name": "checkout-main",
+      "project": "checkout",
+      "env": "prod",
+      "owner": "team-web",
+      "monthly_cost": 2400,
+      "retention_days": 30,
+      "observed_query_lookback_days": 7,
+      "debug_gb_per_day": 18,
+      "debug_monthly_cost": 620
+    },
+    {
+      "name": "catalog-main",
+      "project": "catalog",
+      "env": "prod",
+      "owner": "team-catalog",
+      "monthly_cost": 800,
+      "retention_days": 15,
+      "observed_query_lookback_days": 14,
+      "debug_gb_per_day": 0,
+      "debug_monthly_cost": 0
+    }
+  ],
+  "apm_services": [
+    {
+      "service": "checkout-api",
+      "project": "checkout",
+      "env": "prod",
+      "owner": "team-payments",
+      "qps": 850,
+      "sampling_rate": 0.99,
+      "monthly_cost": 1800
+    },
+    {
+      "service": "catalog-api",
+      "project": "catalog",
+      "env": "prod",
+      "owner": "team-catalog",
+      "qps": 100,
+      "sampling_rate": 0.3,
+      "monthly_cost": 350
+    }
+  ],
+  "hosts": [
+    {
+      "host": "ci-runner-a",
+      "project": "checkout",
+      "env": "prod",
+      "owner": "team-platform",
+      "tier": "prod",
+      "role": "ci",
+      "ephemeral": true,
+      "monthly_cost": 360,
+      "high_water_mark": 26
+    },
+    {
+      "host": "checkout-staging-worker",
+      "project": "checkout",
+      "env": "staging",
+      "owner": "team-web",
+      "tier": "prod",
+      "role": "worker",
+      "ephemeral": false,
+      "monthly_cost": 220,
+      "high_water_mark": 4
+    }
+  ]
+}

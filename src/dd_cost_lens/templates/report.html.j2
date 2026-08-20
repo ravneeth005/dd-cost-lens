@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dd-cost-lens report</title>
+  <style>
+    body { color: #17212b; font: 16px/1.5 Arial, sans-serif; margin: 0 auto; max-width: 1100px; padding: 32px; }
+    h1 { font-size: 32px; margin: 0 0 28px; } h2 { border-bottom: 1px solid #d5dce3; margin-top: 34px; padding-bottom: 6px; }
+    table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #d5dce3; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #eef3f7; } code, pre { background: #f4f6f8; } code { padding: 2px 4px; } pre { overflow-x: auto; padding: 14px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month</h1>
+  <h2>Scope</h2>
+  <table><tbody>
+    <tr><th>Organization</th><td>{{ report.organization }}</td></tr>
+    <tr><th>Scope</th><td><code>{{ report.scope_tag }}:{{ report.project }}</code></td></tr>
+    <tr><th>Environment</th><td><code>{{ report.env_tag }}:{{ report.env }}</code></td></tr>
+  </tbody></table>
+  <h2>Ranked Offenders</h2>
+  <table><thead><tr><th>Title</th><th>Module</th><th>Monthly saving</th><th>Effort</th></tr></thead><tbody>
+  {% for finding in report.findings %}<tr><td>{{ finding.title }}</td><td>{{ finding.module }}</td><td>${{ "%.2f"|format(finding.estimated_monthly_saving) }}</td><td>{{ finding.effort }}</td></tr>
+  {% else %}<tr><td colspan="4">No recoverable savings were identified for this scope.</td></tr>{% endfor %}
+  </tbody></table>
+  <h2>Prioritized Remediation</h2>
+  <ol>{% for finding in report.findings %}<li><strong>{{ finding.title }}</strong>: {{ finding.detail }} Owner: {{ finding.owner_tag }}.</li>{% endfor %}</ol>
+  <h2>Attribution Rollup</h2>
+  <table><thead><tr><th>Owner</th><th>Recoverable monthly saving</th></tr></thead><tbody>
+  {% for owner, amount in report.owner_rollup.items() %}<tr><td>{{ owner }}</td><td>${{ "%.2f"|format(amount) }}</td></tr>{% endfor %}
+  </tbody></table>
+  <h2>Ready-To-Apply Remediations</h2>
+  {% for remediation in report.remediations %}<h3>{{ remediation.title }}</h3><pre>{{ remediation.content }}</pre>{% endfor %}
+  <h2>Next Steps</h2>
+  <p>Address low-effort findings first. Review application or platform changes with the owning service team before removing telemetry.</p>
+</body>
+</html>

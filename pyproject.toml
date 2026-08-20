@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dd-cost-lens"
+version = "0.1.0"
+description = "Read-only Datadog cost optimization CLI for scoped telemetry analysis."
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27.0",
+  "tenacity>=8.2.0",
+  "rich>=13.7.0",
+  "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+dd-cost-lens = "dd_cost_lens.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dd_cost_lens = ["fixtures/*.json", "templates/*.md.j2", "templates/*.html.j2"]
