@@ -271,12 +271,12 @@ def collect_live_data(
             )
         )
 
-        indexed_volume = _as_number(
-            volume_attributes.get(
-                "indexed_volume"
-            ),
-            default=0,
+        volume_available = (
+            "indexed_volume" in volume_attributes
+            and volume_attributes["indexed_volume"] is not None
         )
+
+        indexed_volume = _as_number(volume_attributes["indexed_volume"], default=0) if volume_available else None
 
         ingested_volume = (
             volume_attributes.get(
@@ -350,17 +350,18 @@ def collect_live_data(
             # Datadog does not expose an invoice allocation per metric. The
             # caller supplies its effective contract rate when estimates are
             # required; otherwise this deliberately remains zero.
-            "monthly_cost": round(
-                float(indexed_volume)
-                * metric_monthly_cost_per_timeseries,
-                2,
+            "monthly_cost": (
+                round(float(indexed_volume) * metric_monthly_cost_per_timeseries, 2)
+                if volume_available
+                else None
             ),
 
             # Existing cardinality analyzer expects timeseries.
-            "timeseries": indexed_volume,
+            "timeseries": indexed_volume or 0,
 
             # Preserve Datadog volume values.
             "indexed_volume": indexed_volume,
+            "volume_available": volume_available,
             "ingested_volume": ingested_volume,
 
             # Tag information.
@@ -693,6 +694,30 @@ def discover_live_metadata(
                 service_name
             ] = sorted(
                 existing
+            )
+
+    if scope_tag == "service" and not scope_value:
+        for service_name in projects:
+            metric_envs = _metric_environment_values_for_scope(
+                client,
+                scope_tag,
+                service_name,
+                env_tag,
+            )
+
+            if not metric_envs:
+                continue
+
+            envs[service_name] = sorted(
+                set(envs.get(service_name, [])) | set(metric_envs)
+            )
+
+            discovered_env_values = set(
+                tag_values.get(env_tag, [])
+            )
+            discovered_env_values.update(metric_envs)
+            tag_values[env_tag] = sorted(
+                discovered_env_values
             )
 
     # =========================================================
@@ -1146,6 +1171,31 @@ def _environment_values_from_metrics(
 
     return sorted(active_environments)
 
+
+
+def _metric_environment_values_for_scope(
+    client: DatadogClient,
+    scope_tag: str,
+    scope_value: str,
+    env_tag: str,
+) -> list[str]:
+    """Return active environments for one service from metric metadata."""
+
+    metrics = _list_metrics(
+        client,
+        {
+            "filter[tags]": f"{scope_tag}:{scope_value}",
+            "window[seconds]": METRIC_LOOKBACK_SECONDS,
+        },
+    )
+
+    return _environment_values_from_metrics(
+        client,
+        _metric_names(metrics),
+        scope_tag,
+        scope_value,
+        env_tag,
+    )
 
 def _tag_values_for_key(
     payload: Any,

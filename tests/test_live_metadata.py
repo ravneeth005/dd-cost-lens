@@ -68,6 +68,17 @@ class FakeEnvironmentDatadogClient(FakeDatadogClient):
 
 class FakeMetricTaggedServiceClient(FakeDatadogClient):
     def request(self, method, endpoint_template, **kwargs):
+        if endpoint_template == "/api/v1/tags/hosts":
+            return {
+                "host_tags": [
+                    {
+                        "host_name": "host-a",
+                        "tags_by_source": {
+                            "Datadog": ["service:epc-ws"],
+                        },
+                    }
+                ]
+            }
         if endpoint_template == "/api/v2/metrics":
             scope = kwargs["params"]["filter[tags]"]
             if scope == "service:epc-ws":
@@ -216,3 +227,10 @@ def test_discovers_environment_from_metric_tags_when_host_tag_is_missing():
     assert metadata.projects == ["epc-ws"]
     assert metadata.envs == {"epc-ws": ["staging"]}
     assert "staging" in metadata.tag_values["env"]
+
+
+def test_discovers_unscoped_service_environment_from_metric_tags():
+    metadata = discover_live_metadata(FakeMetricTaggedServiceClient(), "service")
+
+    assert metadata.projects == ["epc-ws"]
+    assert metadata.envs == {"epc-ws": ["staging"]}

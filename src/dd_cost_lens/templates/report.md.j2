@@ -1,4 +1,8 @@
+{% if report.metric_volume_unavailable and report.headline_savings == 0 -%}
+# Recoverable savings: unavailable
+{% else -%}
 # Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month
+{% endif %}
 
 ## Scope
 
@@ -43,10 +47,14 @@ Metric usage is shown below. Set `--metric-monthly-cost-per-timeseries` (or `DD_
 Metric savings use the supplied effective rate of ${{ "%.6f"|format(report.metric_monthly_cost_per_timeseries) }} per indexed timeseries/month.
 {% endif %}
 
+{% if report.metric_volume_unavailable -%}
+**Warning:** Datadog did not return indexed volume for one or more scoped metrics. Metric cost and savings are unavailable; this report must not be used as a cost estimate until volume access/data is available.
+
+{% endif -%}
 | Metric | Indexed volume | Ingested volume | Estimated monthly cost | Indexed tags | Readers |
 | --- | ---: | ---: | ---: | --- | --- |
 {% for metric in report.metrics -%}
-| `{{ metric.name }}` | {{ metric.indexed_volume | default(0, true) }} | {{ metric.ingested_volume | default("-", true) }} | ${{ "%.2f"|format(metric.monthly_cost | default(0, true)) }} | {{ metric.indexed_tags | default([], true) | join(", ") or "-" }} | {{ metric.readers | default([], true) | join(", ") or "unread" }} |
+| `{{ metric.name }}` | {{ metric.indexed_volume if metric.volume_available is not defined or metric.volume_available else "unavailable" }} | {{ metric.ingested_volume | default("-", true) }} | {{ "$%.2f"|format(metric.monthly_cost) if metric.volume_available is not defined or metric.volume_available else "unavailable" }} | {{ metric.indexed_tags | default([], true) | join(", ") or "-" }} | {{ metric.readers | default([], true) | join(", ") or "unread" }} |
 {% else -%}
 | No metrics were returned for this scope. | - | - | - | - | - |
 {% endfor %}

@@ -12,7 +12,12 @@
   </style>
 </head>
 <body>
+  {% if report.metric_volume_unavailable and report.headline_savings == 0 %}
+  <h1>Recoverable savings: unavailable</h1>
+  <p><strong>Warning:</strong> Datadog did not return indexed metric volumes. This report is not a cost estimate.</p>
+  {% else %}
   <h1>Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month</h1>
+  {% endif %}
   <h2>Scope</h2>
   <table><tbody>
     <tr><th>Organization</th><td>{{ report.organization }}</td></tr>

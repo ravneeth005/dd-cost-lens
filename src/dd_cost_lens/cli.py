@@ -603,10 +603,16 @@ def run_once(
         f"Report written to {out}"
     )
 
-    console.print(
-        "Recoverable savings: "
-        f"${report.headline_savings:.2f}/month"
-    )
+    if report.metric_volume_unavailable and report.headline_savings == 0:
+        console.print(
+            "Recoverable savings: unavailable "
+            "(Datadog did not return indexed metric volumes)."
+        )
+    else:
+        console.print(
+            "Recoverable savings: "
+            f"${report.headline_savings:.2f}/month"
+        )
 
     return 0
 

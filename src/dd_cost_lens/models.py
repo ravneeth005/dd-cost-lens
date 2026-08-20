@@ -47,3 +47,12 @@ class ReportData:
     @property
     def headline_savings(self) -> float:
         return round(sum(f.estimated_monthly_saving for f in self.findings), 2)
+
+    @property
+    def metric_volume_unavailable(self) -> bool:
+        """Whether Datadog omitted indexed volume for any scoped metric."""
+        return any(
+            "volume_available" in metric
+            and not metric["volume_available"]
+            for metric in self.metrics
+        )
