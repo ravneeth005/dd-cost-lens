@@ -65,6 +65,40 @@ class FakeEnvironmentDatadogClient(FakeDatadogClient):
         return super().request(method, endpoint_template, **kwargs)
 
 
+
+class FakeMetricTaggedServiceClient(FakeDatadogClient):
+    def request(self, method, endpoint_template, **kwargs):
+        if endpoint_template == "/api/v2/metrics":
+            scope = kwargs["params"]["filter[tags]"]
+            if scope == "service:epc-ws":
+                return {
+                    "data": [
+                        {"id": "ws.active_connections"},
+                        {"id": "ws.disconnection.count"},
+                    ]
+                }
+            if scope == "service:epc-ws AND env:staging":
+                return {"data": [{"id": "ws.active_connections"}]}
+            if scope == "service:epc-ws AND env:production":
+                return {"data": []}
+            raise AssertionError(f"unexpected metric scope: {scope}")
+        if endpoint_template == "/api/v2/metrics/{metric_name}/all-tags":
+            assert kwargs["params"]["filter[tags]"] == "service:epc-ws"
+            assert kwargs["params"]["filter[match]"] == "env"
+            return {
+                "data": {
+                    "attributes": {
+                        "ingested_tags": [
+                            "env:production",
+                            "env:staging",
+                            "service:epc-ws",
+                        ]
+                    }
+                }
+            }
+        return super().request(method, endpoint_template, **kwargs)
+
+
 def test_discovers_organization_projects_and_envs_from_datadog_tags():
     metadata = discover_live_metadata(FakeDatadogClient())
 
@@ -170,3 +204,15 @@ def test_discovers_custom_environment_tag_key():
 
     assert metadata.projects == ["api"]
     assert metadata.envs == {"api": ["production"]}
+
+
+def test_discovers_environment_from_metric_tags_when_host_tag_is_missing():
+    metadata = discover_live_metadata(
+        FakeMetricTaggedServiceClient(),
+        "service",
+        "epc-ws",
+    )
+
+    assert metadata.projects == ["epc-ws"]
+    assert metadata.envs == {"epc-ws": ["staging"]}
+    assert "staging" in metadata.tag_values["env"]

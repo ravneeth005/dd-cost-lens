@@ -710,13 +710,13 @@ def discover_live_metadata(
                 ),
                 "window[seconds]": METRIC_LOOKBACK_SECONDS,
             },
-            page_size=1,
-            paginate=False,
         )
 
-        if _metric_names(
+        scoped_metric_names = _metric_names(
             scoped_metrics
-        ):
+        )
+
+        if scoped_metric_names:
 
             projects = sorted(
                 set(projects)
@@ -742,10 +742,30 @@ def discover_live_metadata(
                 discovered_values
             )
 
-            envs.setdefault(
+            metric_envs = _environment_values_from_metrics(
+                client,
+                scoped_metric_names,
+                scope_tag,
                 scope_value,
-                [],
+                env_tag,
             )
+
+            if metric_envs:
+                envs[scope_value] = sorted(
+                    set(envs.get(scope_value, [])) | set(metric_envs)
+                )
+                discovered_env_values = set(
+                    tag_values.get(env_tag, [])
+                )
+                discovered_env_values.update(metric_envs)
+                tag_values[env_tag] = sorted(
+                    discovered_env_values
+                )
+            else:
+                envs.setdefault(
+                    scope_value,
+                    [],
+                )
 
         # A targeted discovery must not expose environment values from other
         # scopes. This is also the metadata used to validate `run`.
@@ -1068,6 +1088,83 @@ def _metric_names(
         names
     )
 
+
+
+def _environment_values_from_metrics(
+    client: DatadogClient,
+    metric_names: list[str],
+    scope_tag: str,
+    scope_value: str,
+    env_tag: str,
+) -> list[str]:
+    """Discover environment values attached to a scoped metric.
+
+    Host inventory is not a complete source of metric tags. Serverless and
+    browser metrics can carry ``service`` and ``env`` without appearing on a
+    host, so complete targeted discovery from Datadog metric tag metadata.
+    """
+
+    values: set[str] = set()
+    scope_filter = f"{scope_tag}:{scope_value}"
+
+    for metric_name in metric_names:
+        payload = _try_request(
+            client,
+            "GET",
+            "/api/v2/metrics/{metric_name}/all-tags",
+            endpoint=(
+                "/api/v2/metrics/"
+                f"{metric_name}/all-tags"
+            ),
+            params={
+                "window[seconds]": METRIC_LOOKBACK_SECONDS,
+                "filter[tags]": scope_filter,
+                "filter[match]": env_tag,
+                "filter[include_tag_values]": True,
+            },
+        )
+        values.update(_tag_values_for_key(payload, env_tag))
+
+    active_environments: list[str] = []
+
+    for environment in values:
+        scoped_metrics = _list_metrics(
+            client,
+            {
+                "filter[tags]": (
+                    f"{scope_filter} AND "
+                    f"{env_tag}:{environment}"
+                ),
+                "window[seconds]": METRIC_LOOKBACK_SECONDS,
+            },
+            page_size=1,
+            paginate=False,
+        )
+
+        if _metric_names(scoped_metrics):
+            active_environments.append(environment)
+
+    return sorted(active_environments)
+
+
+def _tag_values_for_key(
+    payload: Any,
+    key: str,
+) -> set[str]:
+    """Return values for one tag key from an all-tags API response."""
+
+    attributes = _data_attributes(payload)
+    tags: list[str] = []
+
+    for field in ("indexed_tags", "ingested_tags", "tags"):
+        tags.extend(_string_list(attributes.get(field)))
+
+    prefix = f"{key}:"
+    return {
+        tag.removeprefix(prefix)
+        for tag in tags
+        if tag.startswith(prefix) and tag.removeprefix(prefix)
+    }
 
 def _metric_tag_summary(
     payload: Any,
