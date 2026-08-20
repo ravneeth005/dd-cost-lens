@@ -56,3 +56,10 @@ class ReportData:
             and not metric["volume_available"]
             for metric in self.metrics
         )
+
+    @property
+    def fallback_cost_used(self) -> bool:
+        return any(
+            metric.get("cost_source") == "fallback_allocation"
+            for metric in self.metrics
+        )

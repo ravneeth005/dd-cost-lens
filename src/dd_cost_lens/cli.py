@@ -145,6 +145,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     run.add_argument(
+        "--fallback-monthly-cost",
+        type=float,
+        default=float(os.getenv("DD_COST_LENS_FALLBACK_MONTHLY_COST", "0")),
+        help=(
+            "Optional Finance-approved or test monthly allocation used only "
+            "when Datadog does not return metric volumes. This is an "
+            "estimate, not measured Datadog cost."
+        ),
+    )
+
+    run.add_argument(
         "--projects-file",
         default=None,
         help=(
@@ -243,6 +254,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
 
+        if args.fallback_monthly_cost < 0:
+            console.print(
+                "❌ Error: --fallback-monthly-cost must be zero or greater."
+            )
+            return 2
+
         projects = _projects(
             scope_value,
             args.projects_file,
@@ -308,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
                             args.scope_tag,
                             args.env_tag,
                             args.metric_monthly_cost_per_timeseries,
+                            args.fallback_monthly_cost,
                         )
 
                 except RetryError as error:
@@ -603,7 +621,7 @@ def run_once(
         f"Report written to {out}"
     )
 
-    if report.metric_volume_unavailable and report.headline_savings == 0:
+    if report.metric_volume_unavailable and not report.fallback_cost_used and report.headline_savings == 0:
         console.print(
             "Recoverable savings: unavailable "
             "(Datadog did not return indexed metric volumes)."
@@ -641,6 +659,8 @@ def _load_data(
         env,
         args.scope_tag,
         args.env_tag,
+        args.metric_monthly_cost_per_timeseries,
+        args.fallback_monthly_cost,
     )
 
 

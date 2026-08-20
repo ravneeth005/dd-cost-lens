@@ -47,7 +47,10 @@ Metric usage is shown below. Set `--metric-monthly-cost-per-timeseries` (or `DD_
 Metric savings use the supplied effective rate of ${{ "%.6f"|format(report.metric_monthly_cost_per_timeseries) }} per indexed timeseries/month.
 {% endif %}
 
-{% if report.metric_volume_unavailable -%}
+{% if report.fallback_cost_used -%}
+**Estimate notice:** Datadog did not return indexed metric volumes. Metric costs and savings use the supplied fallback monthly allocation, distributed evenly across the scoped metrics. This is not measured Datadog cost.
+
+{% elif report.metric_volume_unavailable -%}
 **Warning:** Datadog did not return indexed volume for one or more scoped metrics. Metric cost and savings are unavailable; this report must not be used as a cost estimate until volume access/data is available.
 
 {% endif -%}

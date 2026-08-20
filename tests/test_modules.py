@@ -1,3 +1,4 @@
+from dd_cost_lens.models import OrgData
 from dd_cost_lens.data import load_synthetic_data
 from dd_cost_lens.modules import (
     analyze_apm_sampling,
@@ -62,3 +63,24 @@ def test_usage_attribution_rollup():
     findings.extend(analyze_apm_sampling(data, "checkout", "prod"))
     rollup = rollup_by_owner(findings)
     assert rollup["team-payments"] == 1900
+
+
+def test_unqueried_metric_skips_unavailable_cost():
+    data = OrgData(
+        organization="test",
+        projects=["service-a"],
+        envs={"service-a": ["production"]},
+        metrics=[{
+            "name": "metric.without.volume",
+            "project": "service-a",
+            "env": "production",
+            "monthly_cost": None,
+            "readers": [],
+        }],
+        metric_readers={},
+        log_indexes=[],
+        apm_services=[],
+        hosts=[],
+    )
+
+    assert analyze_unqueried_metrics(data, "service-a", "production") == []

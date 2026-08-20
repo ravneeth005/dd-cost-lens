@@ -34,6 +34,7 @@ def _list_metrics(
         "page[size]": page_size,
     }
     metrics: list[Any] = []
+    included: list[Any] = []
 
     while True:
         payload = client.request(
@@ -41,10 +42,15 @@ def _list_metrics(
             "/api/v2/metrics",
             params=request_params,
         )
+
         if isinstance(payload, dict):
             page_metrics = payload.get("data", [])
             if isinstance(page_metrics, list):
                 metrics.extend(page_metrics)
+            page_included = payload.get("included", [])
+            if isinstance(page_included, list):
+                included.extend(page_included)
+
 
         next_cursor = (
             payload.get("meta", {})
@@ -64,7 +70,7 @@ def _list_metrics(
             "page[cursor]": next_cursor,
         }
 
-    return {"data": metrics}
+    return {"data": metrics, "included": included}
 
 
 def load_synthetic_data() -> OrgData:
@@ -90,6 +96,7 @@ def collect_live_data(
     scope_tag: str = "project",
     env_tag: str = "env",
     metric_monthly_cost_per_timeseries: float = 0,
+    fallback_monthly_cost: float = 0,
 ) -> OrgData:
     """
     Collect live Datadog telemetry for one runtime scope.
@@ -139,6 +146,7 @@ def collect_live_data(
         {
             "filter[tags]": query,
             "window[seconds]": METRIC_LOOKBACK_SECONDS,
+            "include": "metric_volumes",
         },
     )
 
@@ -146,9 +154,19 @@ def collect_live_data(
         metrics_payload
     )
 
+    fallback_cost_per_metric = (
+        fallback_monthly_cost / len(metric_names)
+        if fallback_monthly_cost > 0 and metric_names
+        else 0
+    )
+
+    # =========================================================
+    scoped_metric_volumes = _metric_volume_attributes(
+        metrics_payload
+    )
+
     # =========================================================
     # DATADOG OBJECTS USED TO DETECT READERS
-    # =========================================================
 
     dashboards = _try_request(
         client,
@@ -252,24 +270,27 @@ def collect_live_data(
         # REAL METRIC VOLUME
         # -----------------------------------------------------
 
-        volume_payload = _try_request(
-            client,
-            "GET",
-            (
-                "/api/v2/metrics/"
-                "{metric_name}/volumes"
-            ),
-            endpoint=(
-                f"/api/v2/metrics/"
-                f"{name}/volumes"
-            ),
-        )
+        volume_attributes = scoped_metric_volumes.get(name)
 
-        volume_attributes = (
-            _data_attributes(
-                volume_payload
+        if volume_attributes is None:
+            volume_payload = _try_request(
+                client,
+                "GET",
+                (
+                    "/api/v2/metrics/"
+                    "{metric_name}/volumes"
+                ),
+                endpoint=(
+                    f"/api/v2/metrics/"
+                    f"{name}/volumes"
+                ),
             )
-        )
+
+            volume_attributes = (
+                _data_attributes(
+                    volume_payload
+                )
+            )
 
         volume_available = (
             "indexed_volume" in volume_attributes
@@ -282,6 +303,7 @@ def collect_live_data(
             volume_attributes.get(
                 "ingested_volume"
             )
+
         )
 
         # -----------------------------------------------------
@@ -353,7 +375,14 @@ def collect_live_data(
             "monthly_cost": (
                 round(float(indexed_volume) * metric_monthly_cost_per_timeseries, 2)
                 if volume_available
+                else round(fallback_cost_per_metric, 2)
+                if fallback_cost_per_metric
                 else None
+            ),
+            "cost_source": (
+                "datadog_volume" if volume_available
+                else "fallback_allocation" if fallback_cost_per_metric
+                else "unavailable"
             ),
 
             # Existing cardinality analyzer expects timeseries.
@@ -1113,6 +1142,29 @@ def _metric_names(
         names
     )
 
+
+
+def _metric_volume_attributes(
+    payload: Any,
+) -> dict[str, dict[str, Any]]:
+    """Map metric IDs to volumes included by Datadog's filtered list API."""
+
+    if not isinstance(payload, dict):
+        return {}
+
+    volumes: dict[str, dict[str, Any]] = {}
+
+    for item in payload.get("included", []):
+        if not isinstance(item, dict) or item.get("type") != "metric_volumes":
+            continue
+
+        metric_name = item.get("id")
+        attributes = item.get("attributes")
+
+        if isinstance(metric_name, str) and isinstance(attributes, dict):
+            volumes[metric_name] = attributes
+
+    return volumes
 
 
 def _environment_values_from_metrics(

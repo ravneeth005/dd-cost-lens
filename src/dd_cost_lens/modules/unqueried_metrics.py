@@ -9,8 +9,13 @@ def analyze_unqueried_metrics(data: OrgData, project: str, env: str) -> list[Fin
         if metric.get("project") != project or metric.get("env") != env:
             continue
         readers = data.metric_readers.get(metric["name"], metric.get("readers", []))
-        if not readers and metric.get("monthly_cost", 0) > 0:
-            saving = round(float(metric["monthly_cost"]) * 0.8, 2)
+        monthly_cost = metric.get("monthly_cost")
+        if (
+            not readers
+            and isinstance(monthly_cost, (int, float))
+            and monthly_cost > 0
+        ):
+            saving = round(float(monthly_cost) * 0.8, 2)
             findings.append(
                 Finding(
                     module="Unqueried metrics",
