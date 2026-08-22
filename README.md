@@ -4,6 +4,16 @@
 
 It never changes Datadog configuration or removes telemetry.
 
+## Prerequisite: Python
+
+Every person running `dd-cost-lens` from this source repository needs **Python 3.11 or later** installed on their machine. Verify it before setup:
+
+```bash
+py -3.11 --version
+```
+
+If this command is not found, install Python 3.11+ from [python.org](https://www.python.org/downloads/) and reopen Git Bash. Python is not needed only when a standalone packaged executable is distributed separately.
+
 ## Presentation runbook (Git Bash)
 
 Run these commands in this order during an internal demo. They generate reports with the real Datadog service, environment, metric, and owner names. Run credential exports before the meeting; do not display or paste the key values.
