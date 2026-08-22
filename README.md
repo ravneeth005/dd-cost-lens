@@ -4,6 +4,66 @@
 
 It never changes Datadog configuration or removes telemetry.
 
+## Presentation runbook (Git Bash)
+
+Run these commands in this order during a demo. Run credential exports before the meeting; do not display or paste the key values.
+
+```bash
+source .venv/Scripts/activate
+```
+
+### A. Discover the services and environments Datadog can validate
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe discover \
+  --scope-tag service \
+  --env-tag env \
+  --datadog-site us5.datadoghq.com
+```
+
+### B. Verify one service before generating a report
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe discover \
+  --scope-tag service \
+  --scope-value vercel.serverless-runtime \
+  --env-tag env \
+  --datadog-site us5.datadoghq.com
+```
+
+### C. Generate the production analysis report
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe run \
+  --scope-tag service \
+  --scope-value vercel.serverless-runtime \
+  --env-tag env \
+  --env production \
+  --datadog-site us5.datadoghq.com \
+  --redact \
+  --out reports/vercel.serverless-runtime-production.md
+```
+
+Expected outcome: the report is written. If Datadog does not return indexed metric volume, it correctly says `Recoverable savings: unavailable`.
+
+### D. Optional: rate-based staging estimate
+
+Run this only if Finance/FinOps has approved the rate and Datadog returns indexed volume for this scope:
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe run \
+  --scope-tag service \
+  --scope-value epc-ws \
+  --env-tag env \
+  --env staging \
+  --datadog-site us5.datadoghq.com \
+  --metric-monthly-cost-per-timeseries 0.05 \
+  --redact \
+  --out reports/epc-ws-staging.md
+```
+
+Do not run `--fallback-monthly-cost 100` as an actual-cost demo. It is a manual planning estimate, not Datadog cost.
+
 ## What to say in a demo
 
 > The tool discovers valid Datadog service and environment tags, analyzes the selected scope, and produces a prioritized telemetry review report. It only reports a measured rate-based amount when Datadog returns indexed metric volume. If volume is unavailable, it says so rather than inventing an actual cost.
