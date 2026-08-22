@@ -12,7 +12,19 @@ Every person running `dd-cost-lens` from this source repository needs **Python 3
 py -3.11 --version
 ```
 
-If this command is not found, install Python 3.11+ from [python.org](https://www.python.org/downloads/) and reopen Git Bash. Python is not needed only when a standalone packaged executable is distributed separately.
+If this command is not found, install Python 3.11 from PowerShell, Command Prompt, or Git Bash:
+
+```bash
+winget install --id Python.Python.3.11 -e
+```
+
+Close and reopen the terminal after installation, then verify again:
+
+```bash
+py -3.11 --version
+```
+
+If `winget` is unavailable, install Python 3.11+ from [python.org](https://www.python.org/downloads/). Python is not needed only when a standalone packaged executable is distributed separately.
 
 ## Presentation runbook (Git Bash)
 
