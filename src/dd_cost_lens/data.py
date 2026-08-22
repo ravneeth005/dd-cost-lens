@@ -2094,8 +2094,9 @@ def _try_request(
     403:
         permission/product unavailable
 
-    404:
+    404 / 422:
         endpoint/product unavailable
+        or the requested optional tag filter is not accepted
 
     These optional failures must not prevent the main
     metric report.
@@ -2121,6 +2122,7 @@ def _try_request(
                 400,
                 403,
                 404,
+                422,
             }
         ):
 
