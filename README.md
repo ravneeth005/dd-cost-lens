@@ -6,7 +6,7 @@ It never changes Datadog configuration or removes telemetry.
 
 ## Presentation runbook (Git Bash)
 
-Run these commands in this order during a demo. Run credential exports before the meeting; do not display or paste the key values.
+Run these commands in this order during an internal demo. They generate reports with the real Datadog service, environment, metric, and owner names. Run credential exports before the meeting; do not display or paste the key values.
 
 ```bash
 source .venv/Scripts/activate
@@ -40,7 +40,6 @@ source .venv/Scripts/activate
   --env-tag env \
   --env production \
   --datadog-site us5.datadoghq.com \
-  --redact \
   --out reports/vercel.serverless-runtime-production.md
 ```
 
@@ -58,7 +57,6 @@ Run this only if Finance/FinOps has approved the rate and Datadog returns indexe
   --env staging \
   --datadog-site us5.datadoghq.com \
   --metric-monthly-cost-per-timeseries 0.05 \
-  --redact \
   --out reports/epc-ws-staging.md
 ```
 
@@ -144,7 +142,6 @@ This is the production analysis command for the Vercel runtime service:
   --env-tag env \
   --env production \
   --datadog-site us5.datadoghq.com \
-  --redact \
   --out reports/vercel.serverless-runtime-production.md
 ```
 
@@ -162,7 +159,6 @@ Add this only after Finance/FinOps has confirmed the effective contract rate and
   --env staging \
   --datadog-site us5.datadoghq.com \
   --metric-monthly-cost-per-timeseries 0.05 \
-  --redact \
   --out reports/epc-ws-staging.md
 ```
 
@@ -180,7 +176,6 @@ Use this only when Finance supplies a planning allocation or for a demo:
   --env production \
   --datadog-site us5.datadoghq.com \
   --fallback-monthly-cost 100 \
-  --redact \
   --out reports/vercel.serverless-runtime-production-fallback.md
 ```
 

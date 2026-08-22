@@ -18,6 +18,10 @@ FIXTURE_PATH = (
 )
 
 METRIC_LOOKBACK_SECONDS = 604800
+# Datadog permits up to 30 days for the metric-volume endpoint. Use that
+# window for a monthly-cost estimate; the shorter lookback above remains the
+# freshness window used to discover metrics in the requested scope.
+METRIC_VOLUME_LOOKBACK_SECONDS = 2592000
 METRICS_PAGE_SIZE = 1000
 
 
@@ -270,9 +274,13 @@ def collect_live_data(
         # REAL METRIC VOLUME
         # -----------------------------------------------------
 
-        volume_attributes = scoped_metric_volumes.get(name)
+        volume_attributes = scoped_metric_volumes.get(name, {})
 
-        if volume_attributes is None:
+        # The filtered metrics list can include a metric-volume relationship
+        # without returning its attributes. Do not treat that incomplete
+        # relationship as a real volume: query the documented per-metric
+        # endpoint before declaring the value unavailable.
+        if volume_attributes.get("indexed_volume") is None:
             volume_payload = _try_request(
                 client,
                 "GET",
@@ -284,6 +292,9 @@ def collect_live_data(
                     f"/api/v2/metrics/"
                     f"{name}/volumes"
                 ),
+                params={
+                    "window[seconds]": METRIC_VOLUME_LOOKBACK_SECONDS,
+                },
             )
 
             volume_attributes = (
