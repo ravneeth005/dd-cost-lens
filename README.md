@@ -1,33 +1,26 @@
 # dd-cost-lens
 
-`dd-cost-lens` is a read-only Datadog cost-optimization CLI. It analyzes one service/project and environment, identifies telemetry-cost opportunities, and writes a Markdown or HTML report with prioritized remediations.
+`dd-cost-lens` is a read-only Datadog telemetry-cost analysis CLI. It validates a `service`/environment scope, collects available Datadog telemetry metadata, identifies metrics with no detected readers, and creates a Markdown or HTML report.
 
-It does not change Datadog configuration. Credentials are read from environment variables and are never written to disk.
+It never changes Datadog configuration or removes telemetry.
 
-## Requirements
+## What to say in a demo
 
-- Python 3.11 or later
-- A Datadog API key and application key with read access, including `metrics_read`
-- Authorization to access the Datadog organization
+> The tool discovers valid Datadog service and environment tags, analyzes the selected scope, and produces a prioritized telemetry review report. It only reports a measured rate-based amount when Datadog returns indexed metric volume. If volume is unavailable, it says so rather than inventing an actual cost.
 
-## Setup on Windows with Git Bash
+## 1. One-time setup (Windows Git Bash)
 
-Open Git Bash in the repository folder, then create and activate a virtual environment:
+Run these commands in the repository folder:
 
 ```bash
 py -3.11 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
 python -m pip install -e .
-```
-
-After setup, use the executable from the environment:
-
-```bash
 ./.venv/Scripts/dd-cost-lens.exe --help
 ```
 
-PowerShell equivalent:
+PowerShell activation instead:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -35,29 +28,21 @@ py -3.11 -m venv .venv
 python -m pip install -e .
 ```
 
-## Configure Datadog credentials
+## 2. Set Datadog credentials
 
-In Git Bash:
+Create and use new keys if any key was exposed in a terminal, screenshot, chat, or commit.
 
 ```bash
-export DD_API_KEY="<your-api-key>"
-export DD_APP_KEY="<your-application-key>"
+export DD_API_KEY="<Datadog API key>"
+export DD_APP_KEY="<Datadog application key>"
 export DD_SITE="us5.datadoghq.com"
 ```
 
-In PowerShell:
+Do not paste raw credentials into commands, reports, source code, or Git commits.
 
-```powershell
-$env:DD_API_KEY = "<your-api-key>"
-$env:DD_APP_KEY = "<your-application-key>"
-$env:DD_SITE = "us5.datadoghq.com"
-```
+## 3. Discover services and environments
 
-Do not put credentials in source code, reports, or Git commits.
-
-## Step 1: Discover valid services and environments
-
-Start by discovering the tag combinations Datadog can verify:
+Use this first in a presentation:
 
 ```bash
 ./.venv/Scripts/dd-cost-lens.exe discover \
@@ -66,7 +51,7 @@ Start by discovering the tag combinations Datadog can verify:
   --datadog-site us5.datadoghq.com
 ```
 
-To check one known service:
+To verify a known service and list its environments:
 
 ```bash
 ./.venv/Scripts/dd-cost-lens.exe discover \
@@ -76,11 +61,21 @@ To check one known service:
   --datadog-site us5.datadoghq.com
 ```
 
-Use the exact environment tag key displayed by Datadog. For example, the Internal Developer Portal screenshot uses `env:production`, so use `--env-tag env`—not `--env-tag environment`.
+`service` is the scope-tag key and `env` is the environment-tag key. `production`, `preview`, and `staging` are values. A service appears with `env:staging` only when Datadog has received telemetry with both tags, for example `service:epc-ws AND env:staging`.
 
-## Step 2: Run a measured production report
+If you know a staging service, verify it directly:
 
-Use this when Datadog returns metric volumes. Replace `0.05` with the effective monthly indexed-timeseries rate approved by Finance/FinOps for your organization.
+```bash
+./.venv/Scripts/dd-cost-lens.exe discover \
+  --scope-tag service \
+  --scope-value epc-ws \
+  --env-tag env \
+  --datadog-site us5.datadoghq.com
+```
+
+## 4. Generate an analysis report
+
+This is the production analysis command for the Vercel runtime service:
 
 ```bash
 ./.venv/Scripts/dd-cost-lens.exe run \
@@ -89,99 +84,91 @@ Use this when Datadog returns metric volumes. Replace `0.05` with the effective 
   --env-tag env \
   --env production \
   --datadog-site us5.datadoghq.com \
-  --metric-monthly-cost-per-timeseries 0.05 \
   --redact \
   --out reports/vercel.serverless-runtime-production.md
 ```
 
-If Datadog returns indexed volume, the tool calculates metric cost as:
+This fetches available Datadog telemetry metadata and creates the report. It does not guarantee that Datadog will return metric volume or billed cost.
+
+## 5. Rate-based estimate when metric volume is available
+
+Add this only after Finance/FinOps has confirmed the effective contract rate and the report has Datadog-returned indexed volumes:
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe run \
+  --scope-tag service \
+  --scope-value epc-ws \
+  --env-tag env \
+  --env staging \
+  --datadog-site us5.datadoghq.com \
+  --metric-monthly-cost-per-timeseries 0.05 \
+  --redact \
+  --out reports/epc-ws-staging.md
+```
+
+`0.05` is a manually supplied rate. It is not fetched from Datadog and may not match the final invoice because of contract terms, allowances, discounts, and pricing model.
+
+## 6. Fallback allocation — demo/planning only
+
+Use this only when Finance supplies a planning allocation or for a demo:
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe run \
+  --scope-tag service \
+  --scope-value vercel.serverless-runtime \
+  --env-tag env \
+  --env production \
+  --datadog-site us5.datadoghq.com \
+  --fallback-monthly-cost 100 \
+  --redact \
+  --out reports/vercel.serverless-runtime-production-fallback.md
+```
+
+`--fallback-monthly-cost 100` means “use a manual $100/month allocation if Datadog returns no metric volumes.” It is distributed across candidate metrics. It is **not** Datadog cost and must not be reported as actual savings or matched to a Datadog dashboard.
+
+## 7. Verify authoritative Datadog cost
+
+For actual cost by service/environment, ask a Datadog administrator to grant your role:
 
 ```text
-indexed volume × approved monthly rate
+Metrics Read
+Usage Read
+Billing Read
 ```
 
-## Step 3: Run a test or Finance-allocation estimate
+They must also configure `service` and `env` as Usage/Cost Attribution tags in the parent/root Datadog organization.
 
-If Datadog does not return metric volumes, a dollar amount cannot be measured from Datadog. For a demonstration or a Finance-approved allocation, provide an explicit fallback. The report labels it as an estimate and does not present it as measured Datadog cost.
+Then use **Datadog → Organization Settings → Plan & Usage → Cost Details / Cost Attribution**, choose a completed billing month, and filter/group by:
 
-Example using a **test allocation of $100/month**:
+```text
+service:vercel.serverless-runtime
+env:production
+```
+
+The Cost Attribution API can be used after those permissions are granted:
 
 ```bash
-./.venv/Scripts/dd-cost-lens.exe run \
-  --scope-tag service \
-  --scope-value vercel.serverless-runtime \
-  --env-tag env \
-  --env production \
-  --datadog-site us5.datadoghq.com \
-  --metric-monthly-cost-per-timeseries 0.05 \
-  --fallback-monthly-cost 100 \
-  --out reports/vercel.serverless-runtime-production.md
+curl -sS -X GET \
+  "https://api.us5.datadoghq.com/api/v2/cost_by_tag/monthly_cost_attribution?start_month=2026-07&end_month=2026-07&fields=*&tag_breakdown_keys=service,env" \
+  -H "Accept: application/json" \
+  -H "DD-API-KEY: ${DD_API_KEY}" \
+  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
 ```
 
-The fallback allocation is distributed across the scoped metric candidates. If an unread-metric finding is generated, the tool estimates up to 80% of that allocation as recoverable. Never describe this as confirmed Datadog savings.
+Use a completed month and replace `2026-07` with the billing month to inspect. A permission error means the required Datadog role access has not been granted.
 
-You may also set it for the current session:
+## Report interpretation
 
-```bash
-export DD_COST_LENS_FALLBACK_MONTHLY_COST=100
-```
-
-## Other useful commands
-
-Synthetic local demo without Datadog credentials:
-
-```bash
-./.venv/Scripts/dd-cost-lens.exe run \
-  --project checkout \
-  --env prod \
-  --fixture \
-  --redact
-```
-
-All environments for one service:
-
-```bash
-./.venv/Scripts/dd-cost-lens.exe run \
-  --scope-tag service \
-  --scope-value vercel.serverless-runtime \
-  --env-tag env \
-  --env all \
-  --out reports/
-```
-
-Self-contained HTML report:
-
-```bash
-./.venv/Scripts/dd-cost-lens.exe run \
-  --scope-tag service \
-  --scope-value vercel.serverless-runtime \
-  --env-tag env \
-  --env production \
-  --format html \
-  --redact \
-  --out reports/vercel.serverless-runtime-production.html
-```
-
-Show command help:
-
-```bash
-./.venv/Scripts/dd-cost-lens.exe --help
-./.venv/Scripts/dd-cost-lens.exe run --help
-./.venv/Scripts/dd-cost-lens.exe discover --help
-```
-
-## Interpreting report results
-
-| Result | Meaning |
+| Report result | Meaning |
 | --- | --- |
-| Dollar savings with `datadog_volume` | Derived from Datadog-returned indexed volume and the supplied contract rate. Reconcile with Usage/Billing before financial reporting. |
-| `Recoverable savings: unavailable` | Datadog did not return indexed metric volume. A measured dollar estimate is not available. |
-| Estimate notice | The command used `--fallback-monthly-cost`; it is a test or Finance allocation, not measured Datadog cost. |
-| `$0.00/month` | No verified recoverable finding was generated. It does not mean the service has no Datadog cost. |
+| `Recoverable savings: unavailable` | Datadog did not return indexed metric volume. No measured rate-based estimate is available. |
+| Estimate notice | A fallback allocation was supplied. Any dollar amount is a manual planning estimate, not Datadog cost. |
+| Dollar estimate with indexed volume | Rate-based estimate using Datadog-returned volume and a manually supplied approved rate. Reconcile it with Cost Attribution before financial reporting. |
+| `$0.00/month` | No verified recoverable finding was generated; it does not mean the service has no Datadog cost. |
 
-## Safety
+## Safety requirements
 
-- The tool uses an explicit read-only Datadog API allow-list.
-- Review every remediation with the owning team before removing telemetry.
-- Use `--redact` before reports leave the authorized organization.
-- Do not use customer telemetry for development, screenshots, or sample reports without authorization.
+- Do not remove a metric merely because the report calls it `unread`.
+- Review dashboards, monitors, notebooks, SLOs, and service-owner requirements first.
+- Treat `datadog.*` and `trace.*` metrics as potentially platform-generated telemetry; do not remove them without Datadog/platform-owner confirmation.
+- Use `--redact` before sharing a report outside the authorized team.
