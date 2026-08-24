@@ -101,6 +101,7 @@ def collect_live_data(
     env_tag: str = "env",
     metric_monthly_cost_per_timeseries: float = 0,
     fallback_monthly_cost: float = 0,
+    cost_attribution_month: str | None = None,
 ) -> OrgData:
     """
     Collect live Datadog telemetry for one runtime scope.
@@ -524,7 +525,7 @@ def collect_live_data(
     # RETURN ORG DATA
     # =========================================================
 
-    return OrgData(
+    data = OrgData(
         organization=(
             metadata.organization
         ),
@@ -578,6 +579,21 @@ def collect_live_data(
 
         tag_values=tag_values,
     )
+
+    # Cost Attribution is a scope-level billing amount, not a metric-level
+    # price. Keep it separate from `monthly_cost` on individual metrics so
+    # that a real Datadog bill is never invented or allocated by this tool.
+    if cost_attribution_month:
+        data.cost_attribution = _scoped_cost_attribution(
+            client,
+            cost_attribution_month,
+            scope_tag,
+            project,
+            env_tag,
+            env,
+        )
+
+    return data
 
 
 def discover_live_metadata(
@@ -2140,3 +2156,145 @@ def _try_request(
             return {}
 
         raise
+
+
+def _scoped_cost_attribution(
+    client: DatadogClient,
+    month: str,
+    scope_tag: str,
+    scope_value: str,
+    env_tag: str,
+    env: str,
+) -> dict[str, Any]:
+    """Return the actual Cost Attribution amount for one tagged scope.
+
+    The API only returns scope-level billing data. It deliberately does not
+    produce per-metric costs, because Datadog does not expose an invoice
+    allocation for each individual metric.
+    """
+
+    params: dict[str, Any] = {
+        "start_month": month,
+        "end_month": month,
+        "fields": "*",
+        "tag_breakdown_keys": f"{scope_tag},{env_tag}",
+    }
+    records: list[Any] = []
+
+    try:
+        while True:
+            payload = client.request(
+                "GET",
+                "/api/v2/cost_by_tag/monthly_cost_attribution",
+                params=params,
+            )
+            if not isinstance(payload, dict):
+                break
+
+            page = payload.get("data", [])
+            if isinstance(page, list):
+                records.extend(page)
+
+            next_record_id = (
+                payload.get("meta", {})
+                .get("pagination", {})
+                .get("next_record_id")
+            )
+            if not next_record_id:
+                break
+            params["next_record_id"] = next_record_id
+
+    except RetryError:
+        return _unavailable_cost_attribution(
+            month,
+            "Datadog Cost Attribution did not return a response.",
+        )
+    except httpx.HTTPStatusError as error:
+        if error.response.status_code == 403:
+            reason = (
+                "Datadog denied Cost Attribution access. Use a parent-level "
+                "organization and an application key with usage_read and "
+                "billing_read."
+            )
+        else:
+            reason = (
+                "Datadog Cost Attribution request failed with HTTP "
+                f"{error.response.status_code}."
+            )
+        return _unavailable_cost_attribution(month, reason)
+
+    matching_cost = 0.0
+    matched_records = 0
+    for record in records:
+        attributes = record.get("attributes", {}) if isinstance(record, dict) else {}
+        if not isinstance(attributes, dict):
+            continue
+        tags = attributes.get("tags")
+        if not isinstance(tags, dict):
+            continue
+        if not (
+            _attribution_tag_matches(tags.get(scope_tag), scope_value)
+            and _attribution_tag_matches(tags.get(env_tag), env)
+        ):
+            continue
+
+        amount = _attribution_total_cost(attributes.get("values"))
+        if amount is None:
+            continue
+        matching_cost += amount
+        matched_records += 1
+
+    if not matched_records:
+        return _unavailable_cost_attribution(
+            month,
+            "Datadog returned no Cost Attribution record matching "
+            f"{scope_tag}:{scope_value} AND {env_tag}:{env}. Check that both "
+            "tags are configured for Usage Attribution.",
+        )
+
+    return {
+        "available": True,
+        "month": month,
+        "amount": round(matching_cost, 2),
+        "records": matched_records,
+    }
+
+
+def _unavailable_cost_attribution(
+    month: str,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "available": False,
+        "month": month,
+        "reason": reason,
+    }
+
+
+def _attribution_tag_matches(value: Any, expected: str) -> bool:
+    if isinstance(value, str):
+        return value == expected
+    if isinstance(value, list):
+        return expected in value
+    return False
+
+
+def _attribution_total_cost(values: Any) -> float | None:
+    if not isinstance(values, dict):
+        return None
+
+    # Prefer an explicit aggregate when the API supplies one. Otherwise sum
+    # the individual billing-dimension totals. Summing both would double count.
+    direct_total = values.get("total_cost")
+    if isinstance(direct_total, (int, float)):
+        return float(direct_total)
+
+    total = 0.0
+    found = False
+    for name, value in values.items():
+        if not name.endswith("_total_cost"):
+            continue
+        if isinstance(value, (int, float)):
+            total += float(value)
+            found = True
+    return total if found else None

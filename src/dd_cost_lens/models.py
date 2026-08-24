@@ -29,6 +29,7 @@ class OrgData:
     apm_services: list[dict[str, Any]]
     hosts: list[dict[str, Any]]
     tag_values: dict[str, list[str]] = field(default_factory=dict)
+    cost_attribution: dict[str, Any] | None = None
 
 
 @dataclass
@@ -43,6 +44,7 @@ class ReportData:
     owner_rollup: dict[str, float]
     remediations: list[dict[str, Any]]
     metric_monthly_cost_per_timeseries: float = 0
+    cost_attribution: dict[str, Any] | None = None
 
     @property
     def headline_savings(self) -> float:

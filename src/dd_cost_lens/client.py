@@ -92,6 +92,13 @@ _ALLOWED_REQUESTS: set[tuple[str, str]] = {
         "/api/v2/metrics/{metric_name}/volumes",
     ),
 
+    # Cost Attribution. This is read-only and is available only to
+    # authorised parent-level Datadog organisations.
+    (
+        "GET",
+        "/api/v2/cost_by_tag/monthly_cost_attribution",
+    ),
+
     # --------------------------------------------------------
     # Dashboards / monitors / notebooks
     # --------------------------------------------------------

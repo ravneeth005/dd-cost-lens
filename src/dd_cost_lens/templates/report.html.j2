@@ -18,6 +18,13 @@
   {% else %}
   <h1>Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month</h1>
   {% endif %}
+  {% if report.cost_attribution and report.cost_attribution.available %}
+  <h2>Actual Datadog attributed cost</h2>
+  <p><strong>${{ "%.2f"|format(report.cost_attribution.amount) }}</strong> for {{ report.cost_attribution.month }}, fetched from Datadog Cost Attribution for this scope. It is a scope-level billed cost, not a per-metric cost.</p>
+  {% elif report.cost_attribution %}
+  <h2>Actual Datadog attributed cost</h2>
+  <p>Unavailable: {{ report.cost_attribution.reason }}</p>
+  {% endif %}
   <h2>Scope</h2>
   <table><tbody>
     <tr><th>Organization</th><td>{{ report.organization }}</td></tr>

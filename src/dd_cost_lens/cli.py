@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 
 from rich.console import Console
@@ -156,6 +157,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     run.add_argument(
+        "--cost-attribution-month",
+        default=None,
+        metavar="YYYY-MM",
+        help=(
+            "Fetch actual Datadog Cost Attribution for a completed month "
+            "and show the matched scope-level cost in the report. Requires "
+            "a parent-level organisation plus usage_read and billing_read."
+        ),
+    )
+
+    run.add_argument(
         "--projects-file",
         default=None,
         help=(
@@ -260,6 +272,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
 
+        if args.cost_attribution_month and not _is_month(
+            args.cost_attribution_month
+        ):
+            console.print(
+                "Error: --cost-attribution-month must use YYYY-MM."
+            )
+            return 2
+
         projects = _projects(
             scope_value,
             args.projects_file,
@@ -326,6 +346,7 @@ def main(argv: list[str] | None = None) -> int:
                             args.env_tag,
                             args.metric_monthly_cost_per_timeseries,
                             args.fallback_monthly_cost,
+                            args.cost_attribution_month,
                         )
 
                 except RetryError as error:
@@ -586,6 +607,7 @@ def run_once(
         owner_rollup,
         generate_remediations(findings),
         args.metric_monthly_cost_per_timeseries,
+        data.cost_attribution,
     )
 
     if args.redact:
@@ -620,6 +642,19 @@ def run_once(
     console.print(
         f"Report written to {out}"
     )
+
+    if report.cost_attribution:
+        if report.cost_attribution.get("available"):
+            console.print(
+                "Actual Datadog attributed cost: "
+                f"${report.cost_attribution['amount']:.2f} "
+                f"for {report.cost_attribution['month']}"
+            )
+        else:
+            console.print(
+                "Actual Datadog attributed cost: unavailable "
+                f"({report.cost_attribution.get('reason', 'no matching data')})"
+            )
 
     if report.metric_volume_unavailable and not report.fallback_cost_used and report.headline_savings == 0:
         console.print(
@@ -661,6 +696,7 @@ def _load_data(
         args.env_tag,
         args.metric_monthly_cost_per_timeseries,
         args.fallback_monthly_cost,
+        args.cost_attribution_month,
     )
 
 
@@ -749,6 +785,12 @@ def _scope_value(
         args.scope_value
         or args.project
     )
+
+
+def _is_month(value: str) -> bool:
+    """Validate the ISO month format required by Cost Attribution."""
+
+    return bool(re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", value))
 
 
 def _scope_label(

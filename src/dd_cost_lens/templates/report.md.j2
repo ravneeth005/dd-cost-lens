@@ -4,6 +4,18 @@
 # Recoverable savings: ${{ "%.2f"|format(report.headline_savings) }}/month
 {% endif %}
 
+{% if report.cost_attribution and report.cost_attribution.available -%}
+## Actual Datadog attributed cost
+
+**${{ "%.2f"|format(report.cost_attribution.amount) }}** for {{ report.cost_attribution.month }}, fetched from Datadog Cost Attribution for this scope. This is the total attributed cost; it is not allocated across individual metrics.
+
+{% elif report.cost_attribution -%}
+## Actual Datadog attributed cost
+
+Unavailable: {{ report.cost_attribution.reason }}
+
+{% endif %}
+
 ## Scope
 
 | Field | Value |

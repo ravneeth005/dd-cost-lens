@@ -203,7 +203,7 @@ Use this only when Finance supplies a planning allocation or for a demo:
 
 `--fallback-monthly-cost 100` means “use a manual $100/month allocation if Datadog returns no metric volumes.” It is distributed across candidate metrics. It is **not** Datadog cost and must not be reported as actual savings or matched to a Datadog dashboard.
 
-## 7. Verify authoritative Datadog cost
+## 7. Fetch authoritative Datadog cost into the report
 
 For actual cost by service/environment, ask a Datadog administrator to grant your role:
 
@@ -222,7 +222,31 @@ service:vercel.serverless-runtime
 env:production
 ```
 
-The Cost Attribution API can be used after those permissions are granted:
+After those permissions are granted, add `--cost-attribution-month` to the
+normal report command. The month must be complete and use `YYYY-MM`.
+
+```bash
+./.venv/Scripts/dd-cost-lens.exe run \
+  --scope-tag service \
+  --scope-value vercel.serverless-runtime \
+  --env-tag env \
+  --env production \
+  --datadog-site us5.datadoghq.com \
+  --cost-attribution-month 2026-07 \
+  --out reports/vercel.serverless-runtime-production.md
+```
+
+When Datadog authorizes the request and has matching attribution tags, the
+report adds **Actual Datadog attributed cost** for the selected service and
+environment. This value is scope-level billed cost and is deliberately kept
+separate from metric-removal savings.
+
+If the report says the actual cost is unavailable, no cost is fabricated. A
+403 response means the key lacks `usage_read`/`billing_read` access, or the
+organization is not the parent billing organization.
+
+You can also call the Cost Attribution API directly after those permissions
+are granted:
 
 ```bash
 curl -sS -X GET \
@@ -241,6 +265,7 @@ Use a completed month and replace `2026-07` with the billing month to inspect. A
 | `Recoverable savings: unavailable` | Datadog did not return indexed metric volume. No measured rate-based estimate is available. |
 | Estimate notice | A fallback allocation was supplied. Any dollar amount is a manual planning estimate, not Datadog cost. |
 | Dollar estimate with indexed volume | Rate-based estimate using Datadog-returned volume and a manually supplied approved rate. Reconcile it with Cost Attribution before financial reporting. |
+| Actual Datadog attributed cost | A service/environment total returned by Datadog Cost Attribution for the selected completed month. It is not per-metric cost or guaranteed saving. |
 | `$0.00/month` | No verified recoverable finding was generated; it does not mean the service has no Datadog cost. |
 
 ## Safety requirements

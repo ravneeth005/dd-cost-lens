@@ -28,6 +28,7 @@ src/dd_cost_lens/templates/report.html.j2
 src/dd_cost_lens/templates/report.md.j2
 tests/test_cli.py
 tests/test_client.py
+tests/test_cost_attribution.py
 tests/test_live_metadata.py
 tests/test_modules.py
 tests/test_redact_report.py
