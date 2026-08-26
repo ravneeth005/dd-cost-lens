@@ -8,6 +8,10 @@ def analyze_log_volume_and_retention(data: OrgData, project: str, env: str) -> l
     for index in data.log_indexes:
         if index.get("project") != project or index.get("env") != env:
             continue
+        # Log index configuration provides retention, but it does not expose
+        # query-history lookback. Do not infer a retention saving without it.
+        if not index.get("query_history_available", False):
+            continue
         retention = int(index.get("retention_days", 0))
         lookback = int(index.get("observed_query_lookback_days", 0))
         if retention >= lookback * 2 and retention - lookback >= 7:

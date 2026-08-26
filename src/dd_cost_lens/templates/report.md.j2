@@ -74,6 +74,14 @@ Metric savings use the supplied effective rate of ${{ "%.6f"|format(report.metri
 | No metrics were returned for this scope. | - | - | - | - | - |
 {% endfor %}
 
+## Analysis coverage
+
+{% for module, status in report.analysis_status.items() -%}
+- **{{ module }}:** {{ status }}
+{% else -%}
+- No module-collection status was returned.
+{% endfor %}
+
 ## Ranked Offenders
 
 | Title | Module | Estimated monthly saving | Effort |

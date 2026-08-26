@@ -608,6 +608,7 @@ def run_once(
         generate_remediations(findings),
         args.metric_monthly_cost_per_timeseries,
         data.cost_attribution,
+        data.analysis_status,
     )
 
     if args.redact:

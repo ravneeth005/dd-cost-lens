@@ -8,6 +8,10 @@ def analyze_host_inventory(data: OrgData, project: str, env: str) -> list[Findin
     for host in data.hosts:
         if host.get("project") != project:
             continue
+        # The host API provides inventory tags, not a per-host billed amount.
+        # Avoid publishing a $0/guessed saving as an optimisation finding.
+        if not host.get("cost_available", True):
+            continue
         if host.get("env") != env and host.get("tier") == "prod":
             findings.append(
                 Finding(

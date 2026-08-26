@@ -17,6 +17,7 @@ def build_report_data(
     remediations: list[dict],
     metric_monthly_cost_per_timeseries: float = 0,
     cost_attribution: dict | None = None,
+    analysis_status: dict | None = None,
 ) -> ReportData:
     ranked = sorted(findings, key=lambda finding: finding.estimated_monthly_saving, reverse=True)
     scoped_metrics = [
@@ -39,6 +40,7 @@ def build_report_data(
         remediations=remediations,
         metric_monthly_cost_per_timeseries=metric_monthly_cost_per_timeseries,
         cost_attribution=cost_attribution,
+        analysis_status=analysis_status or {},
     )
 
 

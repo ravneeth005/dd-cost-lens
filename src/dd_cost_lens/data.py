@@ -225,6 +225,20 @@ def collect_live_data(
         },
     )
 
+    # Host-tag discovery does not contain individual host records. Retrieve
+    # read-only Infrastructure host data for this scope across environments so
+    # the host module can identify non-prod hosts tagged with a prod tier.
+    scoped_hosts_payload = _try_request(
+        client,
+        "GET",
+        "/api/v1/hosts",
+        params={
+            "filter": f"{scope_tag}:{project}",
+            "count": 1000,
+            "include_hosts_metadata": True,
+        },
+    )
+
     # Older Datadog organizations/sites may return 404.
     # Host usage must not stop the metrics report.
     usage_hosts = _try_request(
@@ -324,7 +338,15 @@ def collect_live_data(
 
         tag_summary = (
             _metric_tag_summary(
-                tags_payload
+                tags_payload,
+                _try_request(
+                    client,
+                    "GET",
+                    "/api/v2/metrics/{metric_name}/tag-cardinalities",
+                    endpoint=(
+                        f"/api/v2/metrics/{name}/tag-cardinalities"
+                    ),
+                ),
             )
         )
 
@@ -541,7 +563,7 @@ def collect_live_data(
         ),
 
         log_indexes=(
-            _extract_live_rows(
+            _normalize_log_indexes(
                 indexes,
                 project,
                 env,
@@ -551,7 +573,7 @@ def collect_live_data(
         ),
 
         apm_services=(
-            _extract_live_rows(
+            _normalize_apm_services(
                 services,
                 project,
                 env,
@@ -561,15 +583,8 @@ def collect_live_data(
         ),
 
         hosts=(
-            _extract_live_rows(
-                {
-                    "hosts": (
-                        hosts_payload
-                    ),
-                    "usage": (
-                        usage_hosts
-                    ),
-                },
+            _normalize_hosts(
+                scoped_hosts_payload,
                 project,
                 env,
                 scope_tag,
@@ -578,6 +593,16 @@ def collect_live_data(
         ),
 
         tag_values=tag_values,
+        analysis_status=_analysis_status(
+            metric_rows,
+            indexes,
+            services,
+            scoped_hosts_payload,
+            project,
+            env,
+            scope_tag,
+            env_tag,
+        ),
     )
 
     # Cost Attribution is a scope-level billing amount, not a metric-level
@@ -1297,6 +1322,7 @@ def _tag_values_for_key(
 
 def _metric_tag_summary(
     payload: Any,
+    cardinality_payload: Any | None = None,
 ) -> dict[str, Any]:
     """
     Normalize Datadog indexed and ingested tag keys.
@@ -1336,21 +1362,42 @@ def _metric_tag_summary(
         )
     )
 
-    return {
-        # Per-tag distinct cardinality is not yet available
-        # from the current source.
-        "top_tag": "unknown",
+    tag_cardinalities: dict[str, int] = {}
+    cardinality_data = (
+        cardinality_payload.get("data", [])
+        if isinstance(cardinality_payload, dict)
+        else []
+    )
+    if isinstance(cardinality_data, list):
+        for item in cardinality_data:
+            if not isinstance(item, dict):
+                continue
+            tag_key = item.get("id")
+            attributes = item.get("attributes", {})
+            if not isinstance(tag_key, str) or not isinstance(attributes, dict):
+                continue
+            delta = _as_number(attributes.get("cardinality_delta"), default=0)
+            tag_cardinalities[tag_key] = delta
 
-        "tag_values": 0,
+    top_tag = (
+        max(tag_cardinalities, key=tag_cardinalities.get)
+        if tag_cardinalities
+        else "unknown"
+    )
+
+    return {
+        # Datadog returns a recent cardinality delta per tag. It is useful
+        # evidence for ranking, but is not an absolute tag-value count.
+        "top_tag": top_tag,
+
+        "tag_values": tag_cardinalities.get(top_tag, 0),
 
         # Must be strings.
         "offending_tags": (
             all_tag_keys
         ),
 
-        # Keep empty until a genuine distinct-value
-        # cardinality source is wired in.
-        "tag_cardinalities": {},
+        "tag_cardinalities": tag_cardinalities,
 
         "indexed_tags": (
             indexed_tags
@@ -1484,6 +1531,185 @@ def _payload_mentions_metric(
         metric_name
         in serialized
     )
+
+
+def _normalize_log_indexes(
+    payload: Any,
+    project: str,
+    env: str,
+    scope_tag: str,
+    env_tag: str,
+) -> list[dict[str, Any]]:
+    """Normalize log-index configuration only when its filter is scoped."""
+
+    indexes = payload.get("indexes", []) if isinstance(payload, dict) else []
+    if not isinstance(indexes, list):
+        return []
+
+    scope = f"{scope_tag}:{project}"
+    environment = f"{env_tag}:{env}"
+    rows: list[dict[str, Any]] = []
+    for index in indexes:
+        if not isinstance(index, dict):
+            continue
+        filter_data = index.get("filter", {})
+        filter_query = (
+            filter_data.get("query", "")
+            if isinstance(filter_data, dict)
+            else ""
+        )
+        if scope not in filter_query or environment not in filter_query:
+            continue
+        rows.append(
+            {
+                "name": str(index.get("name", "unnamed-index")),
+                "project": project,
+                "env": env,
+                "scope_tag": scope_tag,
+                "scope_value": project,
+                "owner": f"{scope_tag}:{project}",
+                "retention_days": _as_number(index.get("num_retention_days"), default=0),
+                "observed_query_lookback_days": 0,
+                "query_history_available": False,
+                "monthly_cost": 0,
+                "filter_query": filter_query,
+            }
+        )
+    return rows
+
+
+def _normalize_apm_services(
+    payload: Any,
+    project: str,
+    env: str,
+    scope_tag: str,
+    env_tag: str,
+) -> list[dict[str, Any]]:
+    """Normalize APM service names without inventing QPS or sampling data."""
+
+    rows: list[dict[str, Any]] = []
+    for item in _iter_apm_service_items(payload):
+        service = _field_value(item, ("service", "name"))
+        if not service:
+            continue
+        # The endpoint is already filtered by environment. Service names are
+        # the available signal; QPS and trace-sampling require additional APM
+        # usage/configuration APIs and therefore remain explicitly unavailable.
+        if service != project and scope_tag == "service":
+            continue
+        rows.append(
+            {
+                "service": service,
+                "project": project,
+                "env": env,
+                "scope_tag": scope_tag,
+                "scope_value": project,
+                "owner": f"{scope_tag}:{project}",
+                "qps": 0,
+                "sampling_rate": 0,
+                "sampling_data_available": False,
+                "monthly_cost": 0,
+            }
+        )
+    return rows
+
+
+def _normalize_hosts(
+    payload: Any,
+    project: str,
+    env: str,
+    scope_tag: str,
+    env_tag: str,
+) -> list[dict[str, Any]]:
+    """Normalize scoped Infrastructure host records and their Datadog tags."""
+
+    host_list = payload.get("host_list", []) if isinstance(payload, dict) else []
+    if not isinstance(host_list, list):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for item in host_list:
+        if not isinstance(item, dict):
+            continue
+        tags = _host_tags(item)
+        tag_map = _tag_map(tags)
+        if project not in tag_map.get(scope_tag, set()):
+            continue
+        host_env = next(iter(tag_map.get(env_tag, {"unknown"})), "unknown")
+        tier = next(iter(tag_map.get("billing_tier", tag_map.get("tier", {"unknown"}))), "unknown")
+        rows.append(
+            {
+                "host": str(item.get("host_name") or item.get("name") or "unknown-host"),
+                "project": project,
+                "env": host_env,
+                "scope_tag": scope_tag,
+                "scope_value": project,
+                "owner": f"{scope_tag}:{project}",
+                "tier": tier,
+                "ephemeral": bool(tag_map.get("kube_pod") or tag_map.get("container_id")),
+                "high_water_mark": None,
+                "monthly_cost": 0,
+                "cost_available": False,
+                "tags": sorted(tags),
+            }
+        )
+    return rows
+
+
+def _host_tags(item: dict[str, Any]) -> list[str]:
+    tags: list[str] = []
+    tags_by_source = item.get("tags_by_source", {})
+    if isinstance(tags_by_source, dict):
+        for source_tags in tags_by_source.values():
+            if isinstance(source_tags, list):
+                tags.extend(tag for tag in source_tags if isinstance(tag, str))
+    raw_tags = item.get("tags", [])
+    if isinstance(raw_tags, list):
+        tags.extend(tag for tag in raw_tags if isinstance(tag, str))
+    return list(dict.fromkeys(tags))
+
+
+def _tag_map(tags: list[str]) -> dict[str, set[str]]:
+    values: dict[str, set[str]] = {}
+    for tag in tags:
+        if ":" not in tag:
+            continue
+        key, value = tag.split(":", 1)
+        if key and value:
+            values.setdefault(key, set()).add(value)
+    return values
+
+
+def _analysis_status(
+    metrics: list[dict[str, Any]],
+    indexes_payload: Any,
+    apm_payload: Any,
+    hosts_payload: Any,
+    project: str,
+    env: str,
+    scope_tag: str,
+    env_tag: str,
+) -> dict[str, str]:
+    """Explain coverage honestly when optional Datadog products omit data."""
+
+    tag_data = sum(1 for metric in metrics if metric.get("tag_cardinalities"))
+    index_rows = _normalize_log_indexes(indexes_payload, project, env, scope_tag, env_tag)
+    apm_rows = _normalize_apm_services(apm_payload, project, env, scope_tag, env_tag)
+    host_rows = _normalize_hosts(hosts_payload, project, env, scope_tag, env_tag)
+    return {
+        "Metric cardinality": (
+            f"Indexed volumes collected for {len(metrics)} metrics; tag-cardinality details returned for {tag_data}."
+        ),
+        "Log retention": (
+            f"{len(index_rows)} scoped log index configurations found. Query-history lookback is not exposed by this API, so no retention saving is calculated."
+        ),
+        "APM sampling": (
+            f"{len(apm_rows)} scoped APM services found. QPS and sampling-rate data were not returned, so no sampling saving is calculated."
+        ),
+        "Host inventory": (
+            f"{len(host_rows)} scoped hosts found. Per-host billing allocation is unavailable, so no host saving is calculated."
+        ),
+    }
 
 
 def _extract_live_rows(

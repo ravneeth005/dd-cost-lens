@@ -67,6 +67,10 @@ _ALLOWED_REQUESTS: set[tuple[str, str]] = {
         "GET",
         "/api/v1/usage/hosts",
     ),
+    (
+        "GET",
+        "/api/v1/hosts",
+    ),
 
     # --------------------------------------------------------
     # Metrics
@@ -90,6 +94,10 @@ _ALLOWED_REQUESTS: set[tuple[str, str]] = {
     (
         "GET",
         "/api/v2/metrics/{metric_name}/volumes",
+    ),
+    (
+        "GET",
+        "/api/v2/metrics/{metric_name}/tag-cardinalities",
     ),
 
     # Cost Attribution. This is read-only and is available only to
