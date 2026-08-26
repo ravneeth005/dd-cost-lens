@@ -31,6 +31,14 @@
     <tr><th>Scope</th><td><code>{{ report.scope_tag }}:{{ report.project }}</code></td></tr>
     <tr><th>Environment</th><td><code>{{ report.env_tag }}:{{ report.env }}</code></td></tr>
   </tbody></table>
+  <h2>Analysis coverage</h2>
+  <ul>
+  {% for module, status in report.analysis_status.items() %}
+    <li><strong>{{ module }}:</strong> {{ status }}</li>
+  {% else %}
+    <li>No module-collection status was returned.</li>
+  {% endfor %}
+  </ul>
   <h2>Ranked Offenders</h2>
   <table><thead><tr><th>Title</th><th>Module</th><th>Monthly saving</th><th>Effort</th></tr></thead><tbody>
   {% for finding in report.findings %}<tr><td>{{ finding.title }}</td><td>{{ finding.module }}</td><td>${{ "%.2f"|format(finding.estimated_monthly_saving) }}</td><td>{{ finding.effort }}</td></tr>

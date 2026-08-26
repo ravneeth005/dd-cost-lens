@@ -49,6 +49,7 @@ class Redactor:
                 report.metric_monthly_cost_per_timeseries
             ),
             cost_attribution=self._walk(report.cost_attribution),
+            analysis_status=self._walk(report.analysis_status),
         )
 
     def _redact_finding(self, finding: Finding) -> Finding:
