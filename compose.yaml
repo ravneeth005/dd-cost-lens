@@ -4,14 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
     image: dd-cost-lens:local
+
     env_file:
-      - path: .env
-        required: false
-    # Run the CLI from the bind-mounted output directory. This lets Git Bash
-    # users pass a relative --out filename without MSYS path conversion.
+      - .env
+
+    # Run the CLI from the bind-mounted output directory.
+    # This lets Git Bash users pass a relative --out filename
+    # without MSYS path conversion.
     working_dir: /reports
+
     volumes:
       - ./reports:/reports
+
     read_only: true
     security_opt:
       - no-new-privileges:true
