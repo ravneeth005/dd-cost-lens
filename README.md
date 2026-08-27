@@ -13,7 +13,7 @@ Use Docker for normal use. It removes the need to install Python, create a virtu
 Install Docker Desktop for Windows, start it, and wait until the Docker engine is running. In Git Bash, open the repository folder and verify Docker:
 
 ```bash
-cd ~/ravneet
+cd ~/
 docker version
 ```
 
