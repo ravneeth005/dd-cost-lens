@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>dd-cost-lens batch report</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <a class="back" href="/">&larr; New analysis</a>
+      <header>
+        <p class="eyebrow">ALL DATADOG-DISCOVERED SCOPES</p>
+        <h1>Telemetry cost review</h1>
+        <p>{{ batch.reports | length }} scope reports completed{% if batch.failures %}; {{ batch.failures | length }} scope reports failed{% endif %}.</p>
+      </header>
+
+      <section class="card">
+        <h2>Scope summary</h2>
+        {% if batch.reports %}
+        <div class="table-wrap"><table>
+          <thead><tr><th>Service</th><th>Environment</th><th>Metrics</th><th>Findings</th><th>Recoverable savings</th></tr></thead>
+          <tbody>
+          {% for report in batch.reports %}
+            <tr>
+              <td>{{ report.project }}</td>
+              <td>{{ report.env }}</td>
+              <td>{{ report.metrics | length }}</td>
+              <td>{{ report.findings | length }}</td>
+              <td>${{ '%.2f' | format(report.headline_savings) }}/month</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table></div>
+        {% else %}
+        <p>No service/environment pairs were returned by Datadog discovery.</p>
+        {% endif %}
+      </section>
+
+      {% if batch.failures %}
+      <section class="card alert-card">
+        <h2>Scopes that could not be analyzed</h2>
+        <ul>
+        {% for service, environment, reason in batch.failures %}
+          <li><strong>{{ service }} / {{ environment }}</strong>: {{ reason }}</li>
+        {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% for report in batch.reports %}
+      <section class="card">
+        <h2>{{ report.project }} / {{ report.env }}</h2>
+        <p class="savings">Recoverable savings: ${{ '%.2f' | format(report.headline_savings) }}/month</p>
+        {% if report.findings %}
+        <ul>
+          {% for finding in report.findings %}
+          <li><strong>{{ finding.title }}</strong> — ${{ '%.2f' | format(finding.estimated_monthly_saving) }}/month</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>No costed findings were generated for this scope.</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </main>
+  </body>
+</html>

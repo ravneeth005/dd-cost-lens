@@ -1,4 +1,4 @@
-# Recoverable savings: $0.24/month
+# Recoverable savings: $0.00/month
 
 
 ## Scope
@@ -38,17 +38,17 @@
 
 ## Metric Inventory
 
-Metric savings use the supplied effective rate of $0.050000 per indexed timeseries/month.
+Metric usage is shown below. Set `--metric-monthly-cost-per-timeseries` (or `DD_COST_LENS_METRIC_TS_MONTHLY_RATE`) to turn metric usage into monetary savings estimates.
 
 | Metric | Indexed volume | Ingested volume | Estimated monthly cost | Indexed tags | Readers |
 | --- | ---: | ---: | ---: | --- | --- |
-| `api.request.count` | 15 | - | $0.75 | - | monitor |
-| `api.response.time` | 15 | - | $0.75 | - | monitor |
-| `ws.active_connections` | 1 | - | $0.05 | - | monitor |
-| `ws.broadcast.count` | 2 | - | $0.10 | - | unread |
-| `ws.broadcast.recipients` | 2 | - | $0.10 | - | unread |
-| `ws.connection.count` | 1 | - | $0.05 | - | unread |
-| `ws.disconnection.count` | 1 | - | $0.05 | - | unread |
+| `api.request.count` | 54 | - | $0.00 | - | monitor |
+| `api.response.time` | 55 | - | $0.00 | - | monitor |
+| `ws.active_connections` | 1 | - | $0.00 | - | monitor |
+| `ws.broadcast.count` | 2 | - | $0.00 | - | unread |
+| `ws.broadcast.recipients` | 2 | - | $0.00 | - | unread |
+| `ws.connection.count` | 1 | - | $0.00 | - | unread |
+| `ws.disconnection.count` | 1 | - | $0.00 | - | unread |
 
 ## Analysis coverage
 
@@ -61,34 +61,17 @@ Metric savings use the supplied effective rate of $0.050000 per indexed timeseri
 
 | Title | Module | Estimated monthly saving | Effort |
 | --- | --- | ---: | --- |
-| Stop ingesting unread metric ws.broadcast.count | Unqueried metrics | $0.08 | low |
-| Stop ingesting unread metric ws.broadcast.recipients | Unqueried metrics | $0.08 | low |
-| Stop ingesting unread metric ws.connection.count | Unqueried metrics | $0.04 | low |
-| Stop ingesting unread metric ws.disconnection.count | Unqueried metrics | $0.04 | low |
 
 ## Prioritized Remediation
 
-1. **Stop ingesting unread metric ws.broadcast.count**: ws.broadcast.count is ingested but has no dashboard, monitor, or notebook readers. Owner: `service:epc-ws`. Estimated saving: $0.08/month.
-2. **Stop ingesting unread metric ws.broadcast.recipients**: ws.broadcast.recipients is ingested but has no dashboard, monitor, or notebook readers. Owner: `service:epc-ws`. Estimated saving: $0.08/month.
-3. **Stop ingesting unread metric ws.connection.count**: ws.connection.count is ingested but has no dashboard, monitor, or notebook readers. Owner: `service:epc-ws`. Estimated saving: $0.04/month.
-4. **Stop ingesting unread metric ws.disconnection.count**: ws.disconnection.count is ingested but has no dashboard, monitor, or notebook readers. Owner: `service:epc-ws`. Estimated saving: $0.04/month.
 
 ## Attribution Rollup
 
 | Owner | Recoverable monthly saving |
 | --- | ---: |
-| service:epc-ws | $0.24 |
 
 ## Ready-To-Apply Remediations
 
-### Stop ingesting unread metric ws.broadcast.count
-
-```bash
-# Remove the emission of ws.broadcast.count from the service instrumentation.
-# Confirm no dashboards, monitors, notebooks, or SLOs depend on it first.
-# Validated Datadog scope: service:epc-ws,env:staging
-
-```
 
 ## Next Steps
 

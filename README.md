@@ -69,6 +69,19 @@ docker compose run --rm dd-cost-lens run \
 
 The report is created at `reports/epc-ws-staging.md` on your laptop. Use a relative output filename as above; do not use `/reports/...` in Git Bash because it can rewrite that container path into an invalid Windows path.
 
+## Local web interface
+
+The optional browser interface uses the same read-only analysis code and reads Datadog credentials only from local `.env`. It is intentionally bound to `127.0.0.1`, so it is available only on your laptop.
+
+```bash
+docker compose build dd-cost-lens-web
+docker compose up dd-cost-lens-web
+```
+
+Open [http://localhost:8000](http://localhost:8000), keep the scope tag as `service`, enter a scope value such as `epc-api`, enter its environment, and choose **Generate scope report**. Datadog validates the pair before analysis.
+
+Stop the local server with `Ctrl+C`. Do not expose port 8000 publicly; use company authentication and an approved deployment design before hosting it for other users.
+
 ### After closing Git Bash
 
 No virtual environment is required. Open Docker Desktop, then run:

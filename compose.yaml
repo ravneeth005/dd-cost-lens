@@ -19,3 +19,28 @@ services:
     read_only: true
     security_opt:
       - no-new-privileges:true
+
+  dd-cost-lens-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dd-cost-lens:local
+    env_file:
+      - .env
+    # Local-only binding: do not expose Datadog-backed results to the network.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./reports:/reports
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    entrypoint:
+      - uvicorn
+      - dd_cost_lens.web:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"

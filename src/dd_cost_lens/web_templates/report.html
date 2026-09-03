@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>dd-cost-lens report</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <a class="back" href="/">&larr; New analysis</a>
+      <header>
+        <p class="eyebrow">{{ report.scope_tag }}:{{ report.project }} &middot; {{ report.env_tag }}:{{ report.env }}</p>
+        <h1>Telemetry cost review</h1>
+        <p class="savings">Recoverable savings: ${{ '%.2f' | format(report.headline_savings) }}/month</p>
+      </header>
+      {% if report.cost_attribution %}
+      <section class="card">
+        <h2>Actual Datadog attributed cost</h2>
+        {% if report.cost_attribution.available %}<p>${{ '%.2f' | format(report.cost_attribution.amount) }} for {{ report.cost_attribution.month }}</p>{% else %}<p>Unavailable: {{ report.cost_attribution.reason }}</p>{% endif %}
+      </section>
+      {% endif %}
+      <section class="card">
+        <h2>Metric inventory</h2>
+        <div class="table-wrap"><table><thead><tr><th>Metric</th><th>Indexed volume</th><th>Estimated cost</th><th>Readers</th></tr></thead><tbody>
+        {% for metric in report.metrics %}
+          <tr><td><code>{{ metric.name }}</code></td><td>{% if metric.volume_available is defined and not metric.volume_available %}unavailable{% else %}{{ metric.indexed_volume | default('-', true) }}{% endif %}</td><td>${{ '%.2f' | format(metric.monthly_cost | default(0, true)) }}</td><td>{{ metric.readers | join(', ') if metric.readers else 'unread' }}</td></tr>
+        {% endfor %}
+        </tbody></table></div>
+      </section>
+      <section class="card">
+        <h2>Prioritized findings</h2>
+        {% if report.findings %}<ol>{% for finding in report.findings %}<li><strong>{{ finding.title }}</strong><br><span class="muted">{{ finding.detail }} Estimated saving: ${{ '%.2f' | format(finding.estimated_monthly_saving) }}/month.</span></li>{% endfor %}</ol>{% else %}<p>No costed findings were generated for this scope.</p>{% endif %}
+      </section>
+      <section class="card">
+        <h2>Analysis coverage</h2>
+        <ul class="coverage-list">{% for name, message in report.analysis_status.items() %}<li><strong>{{ name | replace('_', ' ') | title }}:</strong> {{ message }}</li>{% endfor %}</ul>
+      </section>
+    </main>
+  </body>
+</html>

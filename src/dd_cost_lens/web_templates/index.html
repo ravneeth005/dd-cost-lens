@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>dd-cost-lens</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">READ-ONLY DATADOG ANALYSIS</p>
+        <h1>dd-cost-lens</h1>
+        <p>Generate a telemetry-cost review for a Datadog scope value and environment.</p>
+        {% if organization %}<p class="muted">Organization: {{ organization }}</p>{% endif %}
+      </header>
+      {% if error %}<section class="alert" role="alert">{{ error }}</section>{% endif %}
+      <section class="card">
+        <h2>Generate report</h2>
+        <form action="/analyze" method="post">
+          <label for="scope-tag">Scope tag</label>
+          <input id="scope-tag" value="service" readonly aria-readonly="true">
+          <p class="hint">This organization uses <code>service</code> as the Datadog scope-tag key.</p>
+          <label for="scope-value">Scope value</label>
+          <input id="scope-value" name="scope_value" value="{{ selected_scope_value }}" list="scope-values" placeholder="epc-api" maxlength="200" required>
+          <datalist id="scope-values">
+            {% for scope_value, environments in scopes.items() %}
+            <option value="{{ scope_value }}">{{ environments | join(', ') }}</option>
+            {% endfor %}
+          </datalist>
+          <p class="hint">Choose a suggested value or enter a known value such as <code>epc-api</code>. Datadog validates the scope before analysis.</p>
+          <label for="environment">Environment</label>
+          <input id="environment" name="environment" value="{{ selected_environment }}" placeholder="staging" maxlength="100" required>
+          <p class="hint">Enter the environment for this scope value, for example <code>staging</code> or <code>production</code>.</p>
+          <button type="submit">Generate scope report</button>
+        </form>
+      </section>
+      <section class="card batch-card">
+        <h2>Analyze all discovered scope values</h2>
+        <p>This generates one browser result for every <code>service:&lt;scope-value&gt;</code> and environment pair currently returned by Datadog. It can take a few minutes for a large organization.</p>
+        <form action="/analyze-all" method="post">
+          <button type="submit">Generate all discovered scope reports</button>
+        </form>
+      </section>
+      <section class="card">
+        <h2>Discovered scope values</h2>
+        {% if scopes %}
+          <ul class="scope-list">
+          {% for scope_value, environments in scopes.items() %}
+            <li><strong>service:{{ scope_value }}</strong><span>{{ environments | join(', ') }}</span></li>
+          {% endfor %}
+          </ul>
+        {% else %}
+          <p>No service/environment pairs were returned by Datadog.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
